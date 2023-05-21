@@ -12,7 +12,7 @@ This is a simple API for managing wallets and performing deposit and withdrawal 
 1. Clone the repository:
 
 ```bash
-   git clone https://github.com/your-username/wallet-api.git
+   git clone https://github.com/zahra395/WalletAPI
 ```
 
 Navigate to the project directory:

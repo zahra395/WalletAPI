@@ -15,11 +15,6 @@ This is a simple API for managing wallets and performing deposit and withdrawal 
    git clone https://github.com/zahra395/WalletAPI
 ```
 
-Navigate to the project directory:
-```bash
-cd wallet-api
-```
-
 Install the dependencies:
 ```bash
     pip3 install -r requirements.txt

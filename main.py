@@ -127,12 +127,14 @@ async def transfer_money(source_wallet_id: int, destination_wallet_id: int, amou
         source_transaction = HistoryTransaction(
             wallet_id=source_wallet_id,
             transaction_type="withdraw",
-            amount=amount
+            amount=amount,
+            timestamp=datetime.now()
         )
         destination_transaction = HistoryTransaction(
             wallet_id=destination_wallet_id,
             transaction_type="deposit",
-            amount=amount
+            amount=amount,
+            timestamp=datetime.now()
         )
         session.add(source_transaction)
         session.add(destination_transaction)

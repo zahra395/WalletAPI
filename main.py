@@ -1,7 +1,7 @@
 from typing import List
 
 from sqlmodel import Session
-from sqlalchemy.exc import IntegrityError
+# from sqlmodel.exc import IntegrityError
 from datetime import datetime
 from fastapi import FastAPI, status, Response
 
@@ -21,7 +21,10 @@ async def create_account(account: Account, response: Response):
             session.commit()
             session.refresh(db_user)
         return db_user
-    except IntegrityError:
+
+    except Exception as e:
+        # Handle the duplicate email error
+        session.rollback()
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return {"error": "Account creation failed. Email may not exist or duplicate account entry."}
 
@@ -35,8 +38,9 @@ async def create_wallet(wallet: Wallet, response: Response):
             session.commit()
             session.refresh(db_wallet)
         return db_wallet
-    except IntegrityError:
+    except Exception as e:
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+        session.rollback()
         return {"error": "Wallet creation failed. Account ID may not exist or duplicate wallet entry."}
 
 
@@ -103,41 +107,48 @@ async def get_wallet_history(wallet_id: int) -> List[HistoryTransactionResponse]
 
 @app.get("/wallets/{source_wallet_id}/transfer/{destination_wallet_id}/{amount}", status_code=status.HTTP_200_OK)
 async def transfer_money(source_wallet_id: int, destination_wallet_id: int, amount: float, response: Response):
-    with Session(engine) as session:
-        source_wallet = session.get(Wallet, source_wallet_id)
-        destination_wallet = session.get(Wallet, destination_wallet_id)
+    try:
+        with Session(engine) as session:
+            source_wallet = session.get(Wallet, source_wallet_id)
+            destination_wallet = session.get(Wallet, destination_wallet_id)
 
-        if not source_wallet or not destination_wallet:
-            response.status_code = status.HTTP_404_NOT_FOUND
-            return {"error": "Wallet not found"}
+            if not source_wallet or not destination_wallet:
+                response.status_code = status.HTTP_404_NOT_FOUND
+                return {"error": "Wallet not found"}
 
-        if source_wallet.balance < amount:
-            response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-            return {"error": "Insufficient balance"}
+            if source_wallet.balance < amount:
+                response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+                return {"error": "Insufficient balance"}
 
-        source_wallet.balance -= amount
-        destination_wallet.balance += amount
+            source_wallet.balance -= amount
+            destination_wallet.balance += amount
 
-        # Save the changes in the wallets
-        session.add(source_wallet)
-        session.add(destination_wallet)
-        session.commit()
+            # Save the changes in the wallets
+            session.add(source_wallet)
+            session.add(destination_wallet)
+            session.commit()
 
-        # history transaction records
-        source_transaction = HistoryTransaction(
-            wallet_id=source_wallet_id,
-            transaction_type="withdraw",
-            amount=amount,
-            timestamp=datetime.now()
-        )
-        destination_transaction = HistoryTransaction(
-            wallet_id=destination_wallet_id,
-            transaction_type="deposit",
-            amount=amount,
-            timestamp=datetime.now()
-        )
-        session.add(source_transaction)
-        session.add(destination_transaction)
-        session.commit()
+            # history transaction records
+            source_transaction = HistoryTransaction(
+                wallet_id=source_wallet_id,
+                transaction_type="withdraw",
+                amount=amount,
+                timestamp=datetime.now()
+            )
+            destination_transaction = HistoryTransaction(
+                wallet_id=destination_wallet_id,
+                transaction_type="deposit",
+                amount=amount,
+                timestamp=datetime.now()
+            )
+            session.add(source_transaction)
+            session.add(destination_transaction)
+            session.commit()
 
-        return {"message": "Money transferred successfully"}
+            return {"message": "Money transferred successfully"}
+    except Exception as e:
+        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+        session.rollback()
+        return {"error": "Connection Error"}
+
+    

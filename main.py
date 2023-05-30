@@ -1,15 +1,19 @@
 from typing import List
+import logging
 
+from fastapi.exceptions import RequestValidationError, ValidationError
 from sqlmodel import Session
-# from sqlmodel.exc import IntegrityError
 from datetime import datetime
-from fastapi import FastAPI, status, Response
+from fastapi import FastAPI, status, Response, HTTPException
 
 from config.database import Account, Wallet, HistoryTransaction, engine
 from models.model import HistoryTransactionResponse, WalletUpdateRequest
 
 app = FastAPI()
 session = Session(engine)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @app.post("/accounts", status_code=status.HTTP_201_CREATED)
@@ -20,12 +24,14 @@ async def create_account(account: Account, response: Response):
             session.add(db_user)
             session.commit()
             session.refresh(db_user)
+        logger.info("create account completed successfully")
         return db_user
 
     except Exception as e:
         # Handle the duplicate email error
-        session.rollback()
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+        logger.error(f"Error occurred during create account: {str(e)}")
+        session.rollback()
         return {"error": "Account creation failed. Email may not exist or duplicate account entry."}
 
 
@@ -37,9 +43,11 @@ async def create_wallet(wallet: Wallet, response: Response):
             session.add(db_wallet)
             session.commit()
             session.refresh(db_wallet)
+        logger.info("create wallet completed successfully")
         return db_wallet
     except Exception as e:
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+        logger.error(f"Error occurred during create wallet: {str(e)}")
         session.rollback()
         return {"error": "Wallet creation failed. Account ID may not exist or duplicate wallet entry."}
 
@@ -50,6 +58,7 @@ async def deposite(wallet_id: int, wallet_update: WalletUpdateRequest, response:
         wallet = session.get(Wallet, wallet_id)
         if not wallet:
             response.status_code = status.HTTP_404_NOT_FOUND
+            logger.error("Wallet not found")
             return {"error": "Wallet not found"}
 
         wallet.balance += wallet_update.amount
@@ -65,7 +74,7 @@ async def deposite(wallet_id: int, wallet_update: WalletUpdateRequest, response:
     session.add(wallet)
     session.commit()
     session.refresh(wallet)
-
+    logger.info(f"deposit {wallet_update.amount} completed successfully for wallet id : {wallet_id}")
     return wallet
 
 
@@ -75,10 +84,12 @@ async def withdraw(wallet_id: int, wallet_update: WalletUpdateRequest, response:
         wallet = session.get(Wallet, wallet_id)
         if not wallet:
             response.status_code = status.HTTP_404_NOT_FOUND
+            logger.error("Wallet not found")
             return {"error": "Wallet not found"}
 
         if wallet.balance < wallet_update.amount:
             response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+            logger.error("Insufficient balance")
             return {"error": "Insufficient balance"}
 
         wallet.balance -= wallet_update.amount
@@ -94,6 +105,7 @@ async def withdraw(wallet_id: int, wallet_update: WalletUpdateRequest, response:
     session.add(wallet)
     session.commit()
     session.refresh(wallet)
+    logger.info(f"Withdraw {wallet_update.amount} completed successfully for wallet id : {wallet_id}")
 
     return wallet
 
@@ -102,6 +114,7 @@ async def withdraw(wallet_id: int, wallet_update: WalletUpdateRequest, response:
 async def get_wallet_history(wallet_id: int) -> List[HistoryTransactionResponse]:
     with Session(engine) as session:
         transactions = session.query(HistoryTransaction).filter(HistoryTransaction.wallet_id == wallet_id).all()
+        logger.info(f"History translation completed successfully for wallet id : {wallet_id}")
         return transactions
 
 
@@ -114,10 +127,12 @@ async def transfer_money(source_wallet_id: int, destination_wallet_id: int, amou
 
             if not source_wallet or not destination_wallet:
                 response.status_code = status.HTTP_404_NOT_FOUND
+                logger.error("Wallet not found")
                 return {"error": "Wallet not found"}
 
             if source_wallet.balance < amount:
                 response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+                logger.error("Insufficient balance")
                 return {"error": "Insufficient balance"}
 
             source_wallet.balance -= amount
@@ -126,7 +141,6 @@ async def transfer_money(source_wallet_id: int, destination_wallet_id: int, amou
             # Save the changes in the wallets
             session.add(source_wallet)
             session.add(destination_wallet)
-            session.commit()
 
             # history transaction records
             source_transaction = HistoryTransaction(
@@ -144,11 +158,22 @@ async def transfer_money(source_wallet_id: int, destination_wallet_id: int, amou
             session.add(source_transaction)
             session.add(destination_transaction)
             session.commit()
+            logger.info(
+                f"Transfer of {amount} from wallet {source_wallet_id} to wallet {destination_wallet_id} completed "
+                f"successfully")
 
             return {"message": "Money transferred successfully"}
-    except Exception as e:
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        session.rollback()
-        return {"error": "Connection Error"}
 
-    
+    # When a validation error in the request body
+    except RequestValidationError as validation_error:
+        raise HTTPException(status_code=422, detail=validation_error.errors())
+
+    # When failed validation rules
+    except ValidationError as validation_error:
+        error_msg = validation_error.errors()[0]["msg"]
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        logger.error(f"Transfer failed: {str(e)}")
+        session.rollback()
+        raise HTTPException(status_code=500, detail="Transfer failed")

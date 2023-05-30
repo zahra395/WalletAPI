@@ -3,6 +3,8 @@ import logging
 
 from fastapi.exceptions import RequestValidationError, ValidationError
 from sqlmodel import Session
+from sqlalchemy.exc import IntegrityError
+
 from datetime import datetime
 from fastapi import FastAPI, status, Response, HTTPException
 
@@ -27,7 +29,7 @@ async def create_account(account: AccountCreate, response: Response):
         logger.info("create account completed successfully")
         return db_user
 
-    except Exception as e:
+    except IntegrityError as e:
         # Handle the duplicate email error
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         logger.error(f"Error occurred during create account: {str(e)}")
@@ -173,7 +175,7 @@ async def transfer_money(source_wallet_id: int, destination_wallet_id: int, amou
         error_msg = validation_error.errors()[0]["msg"]
         raise HTTPException(status_code=400, detail=error_msg)
 
-    except Exception as e:
+    except IntegrityError as e:
         logger.error(f"Transfer failed: {str(e)}")
         session.rollback()
         raise HTTPException(status_code=500, detail="Transfer failed")

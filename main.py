@@ -20,38 +20,39 @@ logger = logging.getLogger(__name__)
 
 @app.post("/accounts", status_code=status.HTTP_201_CREATED)
 async def create_account(account: AccountCreate, response: Response):
-    try:
-        db_user = Account(email=account.email, password=account.password, username=account.username)
-        with Session(engine) as session:
+    with Session(engine) as session:
+        email = session.query(Account).filter(Account.email == account.email).first()
+        if email is None:
+            db_user = Account(email=account.email, password=account.password, username=account.username)
             session.add(db_user)
             session.commit()
             session.refresh(db_user)
-        logger.info("create account completed successfully")
-        return db_user
-
-    except IntegrityError as e:
-        # Handle the duplicate email error
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        logger.error(f"Error occurred during create account: {str(e)}")
-        session.rollback()
-        return {"error": "Account creation failed. Email may not exist or duplicate account entry."}
+            logger.info("create account completed successfully")
+            return db_user
+        else:
+            response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+            logger.error("Account creation failed. Email may not exist or duplicate account entry")
+            session.rollback()
+            return {"error": "Account creation failed. Email may not exist or duplicate account entry."}
 
 
 @app.post("/wallets", status_code=status.HTTP_201_CREATED)
 async def create_wallet(wallet: WalletCreate, response: Response):
-    try:
-        db_wallet = Wallet(balance=wallet.balance, account_id=wallet.account_id)
-        with Session(engine) as session:
+    with Session(engine) as session:
+        exist_wallet = session.query(Wallet).filter(Wallet.account_id == wallet.account_id).first()
+        if exist_wallet is None:
+            db_wallet = Wallet(balance=wallet.balance, account_id=wallet.account_id)
             session.add(db_wallet)
             session.commit()
             session.refresh(db_wallet)
-        logger.info("create wallet completed successfully")
-        return db_wallet
-    except Exception as e:
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        logger.error(f"Error occurred during create wallet: {str(e)}")
-        session.rollback()
-        return {"error": "Wallet creation failed. Account ID may not exist or duplicate wallet entry."}
+            logger.info("create wallet completed successfully")
+            return db_wallet
+
+        else:
+            response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+            logger.error("Wallet creation failed. Account ID may not exist or duplicate wallet entry.")
+            session.rollback()
+            return {"error": "Wallet creation failed. Account ID may not exist or duplicate wallet entry."}
 
 
 @app.put("/wallets/deposite", status_code=status.HTTP_200_OK)

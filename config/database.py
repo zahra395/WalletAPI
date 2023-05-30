@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, create_engine, Field
+# from sqlmodel import
 from datetime import datetime
 
 from setting import AppSettings
@@ -9,7 +10,7 @@ engine = create_engine(DATABASE_URL)
 
 
 class Account(SQLModel, table=True):
-    account_id: int = Field(default=None, primary_key=True)
+    account_id: int = Field(default=None, primary_key=True, )
     username: str = Field(max_length=50)
     email: str = Field(index=True, unique=True)
     password: str = Field()

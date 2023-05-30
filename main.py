@@ -6,9 +6,8 @@ from sqlmodel import Session
 from datetime import datetime
 from fastapi import FastAPI, status, Response, HTTPException
 
+from schemas.schemas import AccountCreate, WalletCreate, HistoryTransactionResponse, WalletUpdateRequest
 from config.database import Account, Wallet, HistoryTransaction, engine
-from models.model import HistoryTransactionResponse, WalletUpdateRequest
-
 
 app = FastAPI()
 session = Session(engine)
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @app.post("/accounts", status_code=status.HTTP_201_CREATED)
-async def create_account(account: Account, response: Response):
+async def create_account(account: AccountCreate, response: Response):
     try:
         db_user = Account(email=account.email, password=account.password, username=account.username)
         with Session(engine) as session:
@@ -37,7 +36,7 @@ async def create_account(account: Account, response: Response):
 
 
 @app.post("/wallets", status_code=status.HTTP_201_CREATED)
-async def create_wallet(wallet: Wallet, response: Response):
+async def create_wallet(wallet: WalletCreate, response: Response):
     try:
         db_wallet = Wallet(balance=wallet.balance, account_id=wallet.account_id)
         with Session(engine) as session:

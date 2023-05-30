@@ -1,8 +1,10 @@
 from sqlmodel import SQLModel, create_engine, Field
 from datetime import datetime
 
-DATABASE_URL = "postgresql://postgres:postgr@127.0.0.1:5432/Test"
+from setting import AppSettings
 
+settings = AppSettings()
+DATABASE_URL = settings.database_url
 engine = create_engine(DATABASE_URL)
 
 

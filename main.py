@@ -9,6 +9,7 @@ from fastapi import FastAPI, status, Response, HTTPException
 from config.database import Account, Wallet, HistoryTransaction, engine
 from models.model import HistoryTransactionResponse, WalletUpdateRequest
 
+
 app = FastAPI()
 session = Session(engine)
 

@@ -9,7 +9,7 @@ class AccountCreate(BaseModel):
 
 
 class WalletCreate(BaseModel):
-    account_id: int
+    # account_id: int
     balance: float
 
 
